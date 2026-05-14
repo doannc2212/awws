@@ -1,0 +1,27 @@
+[daemon]
+interval_secs = 1800
+change_on_login = true
+change_on_unlock = true
+
+[setter]
+backend = "awww"
+transition = "fade"
+transition_duration = 1.5
+
+[sources]
+rotation = "weighted_random"
+
+[[sources.list]]
+type = "local"
+weight = 2
+path = "~/Pictures/Wallpapers"
+order = "random"
+
+[[sources.list]]
+type = "bing"
+weight = 1
+
+[cache]
+max_size_mb = 500
+history_size = 100
+dir = "~/.cache/awws/images"

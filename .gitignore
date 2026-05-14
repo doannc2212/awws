@@ -1,0 +1,16 @@
+/target/
+**/*.rs.bk
+*.log
+
+# Local editor and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local runtime/config artifacts
+/config.local.toml
+/.env
+/.env.*
+!/config.toml
