@@ -154,6 +154,23 @@ pub fn expand_path(path: &str) -> PathBuf {
     PathBuf::from(path)
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum SourceKind {
+    LocalOnly,
+    RemoteOnly,
+    Mixed,
+}
+
+pub fn classify_sources(sources: &[SourceConfig]) -> SourceKind {
+    let has_local = sources.iter().any(|s| matches!(s, SourceConfig::Local { .. }));
+    let has_remote = sources.iter().any(|s| !matches!(s, SourceConfig::Local { .. }));
+    match (has_local, has_remote) {
+        (true, false) => SourceKind::LocalOnly,
+        (false, true) => SourceKind::RemoteOnly,
+        _ => SourceKind::Mixed,
+    }
+}
+
 pub fn source_weight(source: &SourceConfig) -> u32 {
     match source {
         SourceConfig::Local { weight, .. }

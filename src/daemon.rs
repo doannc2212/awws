@@ -56,10 +56,18 @@ struct DaemonState {
     triggers: mpsc::Receiver<TriggerEvent>,
     paused: bool,
     next_change_at: Option<chrono::DateTime<chrono::Utc>>,
+    source_kind: config::SourceKind,
 }
 
 impl DaemonState {
     async fn build(config_path: PathBuf, cfg: config::AppConfig) -> Result<Self> {
+        let source_kind = config::classify_sources(&cfg.sources.list);
+        if source_kind == config::SourceKind::Mixed {
+            return Err(anyhow::anyhow!(
+                "mixed local and remote sources are not supported; use only local or only remote sources"
+            ));
+        }
+
         let cache = ImageCache::new(&cfg.cache).await?;
         let history = cache.load_history(cfg.cache.history_size).await?;
         let sources = SourceRegistry::from_config(&cfg, cache.clone())?;
@@ -79,11 +87,19 @@ impl DaemonState {
             triggers,
             paused: false,
             next_change_at,
+            source_kind,
         })
     }
 
     async fn reload(&mut self) -> Result<()> {
         let cfg = config::load(&self.config_path)?;
+        let source_kind = config::classify_sources(&cfg.sources.list);
+        if source_kind == config::SourceKind::Mixed {
+            return Err(anyhow::anyhow!(
+                "mixed local and remote sources are not supported; use only local or only remote sources"
+            ));
+        }
+
         let cache = ImageCache::new(&cfg.cache).await?;
         let history = cache.load_history(cfg.cache.history_size).await?;
         let sources = SourceRegistry::from_config(&cfg, cache.clone())?;
@@ -99,6 +115,7 @@ impl DaemonState {
         self.setter_opts = setter_opts;
         self.triggers = triggers;
         self.next_change_at = next_change_at(self.cfg.daemon.interval_secs);
+        self.source_kind = source_kind;
         Ok(())
     }
 
@@ -160,7 +177,17 @@ impl DaemonState {
             return Ok(entry);
         }
 
-        self.advance("ipc next".to_string()).await
+        match self.source_kind {
+            config::SourceKind::LocalOnly => {
+                if let Some(entry) = self.history.wrap_to_first() {
+                    self.setter.set(&entry.path, &self.setter_opts).await?;
+                    self.cache.save_history(&self.history).await?;
+                    return Ok(entry);
+                }
+                self.advance("ipc next (initial)".to_string()).await
+            }
+            _ => self.advance("ipc next".to_string()).await,
+        }
     }
 
     fn status(&self) -> StatusResponse {

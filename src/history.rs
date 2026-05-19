@@ -98,6 +98,14 @@ impl History {
         self.cursor.and_then(|idx| self.entries.get(idx).cloned())
     }
 
+    pub fn wrap_to_first(&mut self) -> Option<HistoryEntry> {
+        if self.entries.is_empty() {
+            return None;
+        }
+        self.cursor = Some(0);
+        self.current()
+    }
+
     pub fn entries(&self) -> impl Iterator<Item = &HistoryEntry> {
         self.entries.iter()
     }
