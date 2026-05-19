@@ -1,27 +1,42 @@
 [daemon]
-interval_secs = 1800
-change_on_login = true
-change_on_unlock = true
+interval_secs = 1800    # how often to rotate wallpapers, in seconds (1800 = 30 min)
+change_on_login = true  # change wallpaper when you log in
+change_on_unlock = true # change wallpaper when you unlock your screen
 
 [setter]
-backend = "awww"
-transition = "fade"
-transition_duration = 1.5
+backend = "awww"           # awww | hyprpaper | swww | swaybg
+transition = "fade"        # transition effect — passed directly to the backend binary
+transition_duration = 1.5  # transition length in seconds (ignored by hyprpaper and swaybg)
 
 [sources]
-rotation = "weighted_random"
+rotation = "weighted_random"  # weighted_random | round_robin
 
-[[sources.list]]
-type = "local"
-weight = 2
-path = "~/Pictures/Wallpapers"
-order = "random"
+# mixing local and remote sources is not supported — use one type only.
+# local-only: `awws next` cycles through history. remote-only: fetches a new image.
 
 [[sources.list]]
 type = "bing"
 weight = 1
 
+# [[sources.list]]
+# type = "local"
+# path = "~/Pictures/Wallpapers"
+# order = "random"   # random | sequential
+# weight = 1
+
+# [[sources.list]]
+# type = "unsplash"
+# api_key = "your_api_key_here"
+# query = "nature"          # optional
+# orientation = "landscape" # optional — landscape | portrait | squarish
+# weight = 1
+
+# [[sources.list]]
+# type = "nasa_apod"
+# api_key = "your_api_key_here"
+# weight = 1
+
 [cache]
-max_size_mb = 500
-history_size = 100
-dir = "~/.cache/awws/images"
+max_size_mb = 500              # max disk space for cached images, in MB
+history_size = 100             # how many past wallpapers to remember
+dir = "~/.cache/awws/images"  # where to store downloaded images

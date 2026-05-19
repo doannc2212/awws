@@ -142,22 +142,56 @@ api_key = "your_api_key_here"
 weight = 1
 ```
 
-#### mixing sources
+#### source type and `next` behaviour
 
-here's an example of how i like to combine them — local wallpapers most of the time, with bing filling in when i want something fresh:
+awws distinguishes between local and remote sources, and this affects how `awws next` works:
+
+- **local-only** — `awws next` cycles through your history. when it reaches the latest wallpaper it wraps back to the oldest, so you get a smooth loop through everything that's been shown.
+- **remote-only** (bing, unsplash, nasa apod) — `awws next` always fetches a fresh image from the source.
+- **mixed** — combining local and remote sources in the same config is not supported. awws will refuse to start and print an error. keep all your sources either local or remote.
+
+#### multiple remote sources
+
+stack multiple remote sources and awws picks between them according to `rotation` and `weight`:
 
 ```toml
 [sources]
 rotation = "weighted_random"
 
 [[sources.list]]
-type = "local"
-path = "~/Pictures/Wallpapers"
-order = "random"
-weight = 3
+type = "bing"
+weight = 1
 
 [[sources.list]]
-type = "bing"
+type = "unsplash"
+api_key = "your_api_key_here"
+query = "nature"
+weight = 2
+
+[[sources.list]]
+type = "nasa_apod"
+api_key = "your_api_key_here"
+weight = 1
+```
+
+#### multiple local sources
+
+point at multiple folders — useful if you keep wallpapers organised by category:
+
+```toml
+[sources]
+rotation = "round_robin"
+
+[[sources.list]]
+type = "local"
+path = "~/Pictures/Wallpapers/landscapes"
+order = "random"
+weight = 1
+
+[[sources.list]]
+type = "local"
+path = "~/Pictures/Wallpapers/minimal"
+order = "sequential"
 weight = 1
 ```
 
@@ -179,7 +213,7 @@ dir = "~/.cache/awws/images"  # where to store them
 add to your `hyprland.conf`:
 
 ```
-exec-once = awws start
+exec-once = awws daemon
 ```
 
 ---
