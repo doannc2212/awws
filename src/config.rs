@@ -125,8 +125,17 @@ impl Default for CacheConfig {
     }
 }
 
+const DEFAULT_CONFIG: &str = include_str!("../config.toml");
+
 pub fn load(path: &std::path::Path) -> Result<AppConfig> {
     if !path.exists() {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create config dir {}", parent.display()))?;
+        }
+        fs::write(path, DEFAULT_CONFIG)
+            .with_context(|| format!("failed to write default config to {}", path.display()))?;
+        tracing::info!("created default config at {}", path.display());
         return Ok(AppConfig::default());
     }
 
@@ -245,8 +254,11 @@ mod tests {
 
     #[test]
     fn load_missing_file_returns_default() {
-        let cfg = load(std::path::Path::new("/nonexistent/awws/config.toml")).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let cfg = load(&path).unwrap();
         assert_eq!(cfg.daemon.interval_secs, 1800);
+        assert!(path.exists(), "default config should have been written");
     }
 
     #[test]
