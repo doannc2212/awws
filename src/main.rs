@@ -42,7 +42,9 @@ enum Command {
 #[tokio::main]
 async fn main() -> Result<()> {
     let log_dir = dirs::state_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from(std::env::var("HOME").unwrap_or_default()).join(".local/state"))
+        .unwrap_or_else(|| {
+            std::path::PathBuf::from(std::env::var("HOME").unwrap_or_default()).join(".local/state")
+        })
         .join("awws");
     std::fs::create_dir_all(&log_dir).ok();
 

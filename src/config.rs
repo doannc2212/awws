@@ -171,8 +171,12 @@ pub enum SourceKind {
 }
 
 pub fn classify_sources(sources: &[SourceConfig]) -> SourceKind {
-    let has_local = sources.iter().any(|s| matches!(s, SourceConfig::Local { .. }));
-    let has_remote = sources.iter().any(|s| !matches!(s, SourceConfig::Local { .. }));
+    let has_local = sources
+        .iter()
+        .any(|s| matches!(s, SourceConfig::Local { .. }));
+    let has_remote = sources
+        .iter()
+        .any(|s| !matches!(s, SourceConfig::Local { .. }));
     match (has_local, has_remote) {
         (true, false) => SourceKind::LocalOnly,
         (false, true) => SourceKind::RemoteOnly,
