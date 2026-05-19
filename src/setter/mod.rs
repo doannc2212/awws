@@ -33,9 +33,38 @@ pub fn from_config(cfg: &SetterConfig) -> Result<Arc<dyn WallpaperSetter>> {
     match cfg.backend.as_str() {
         "awww" => Ok(Arc::new(awww::AwwwSetter)),
         "swww" => Ok(Arc::new(swww::SwwwSetter)),
-        "hyprpaper" => Ok(Arc::new(hyprpaper::HyprpaperSetter::new())),
+        "hyprpaper" => Ok(Arc::new(hyprpaper::HyprpaperSetter)),
         "swaybg" => Ok(Arc::new(swaybg::SwaybgSetter)),
+        "auto" => Ok(Arc::new(FallbackSetter(vec![
+            Arc::new(awww::AwwwSetter),
+            Arc::new(swww::SwwwSetter),
+            Arc::new(hyprpaper::HyprpaperSetter),
+            Arc::new(swaybg::SwaybgSetter),
+        ]))),
         other => Err(anyhow!("unknown setter backend: {other}")),
+    }
+}
+
+struct FallbackSetter(Vec<Arc<dyn WallpaperSetter>>);
+
+#[async_trait]
+impl WallpaperSetter for FallbackSetter {
+    async fn set(&self, path: &Path, opts: &SetterOptions) -> Result<()> {
+        let mut last_err = anyhow!("no setters configured");
+        for setter in &self.0 {
+            match setter.set(path, opts).await {
+                Ok(()) => return Ok(()),
+                Err(e) => {
+                    tracing::warn!(setter = setter.name(), err = %e, "setter failed, trying next");
+                    last_err = e;
+                }
+            }
+        }
+        Err(last_err)
+    }
+
+    fn name(&self) -> &str {
+        "auto"
     }
 }
 
@@ -46,7 +75,7 @@ mod tests {
 
     #[test]
     fn from_config_all_known_backends() {
-        for backend in &["awww", "swww", "hyprpaper", "swaybg"] {
+        for backend in &["awww", "swww", "hyprpaper", "swaybg", "auto"] {
             let cfg = SetterConfig {
                 backend: backend.to_string(),
                 ..SetterConfig::default()

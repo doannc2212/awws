@@ -99,7 +99,7 @@ impl Default for DaemonConfig {
 impl Default for SetterConfig {
     fn default() -> Self {
         Self {
-            backend: "awww".to_string(),
+            backend: "auto".to_string(),
             transition: Some("fade".to_string()),
             transition_duration: 1.5,
         }
@@ -265,7 +265,7 @@ mod tests {
     #[test]
     fn default_setter_config() {
         let cfg = SetterConfig::default();
-        assert_eq!(cfg.backend, "awww");
+        assert_eq!(cfg.backend, "auto");
         assert_eq!(cfg.transition, Some("fade".to_string()));
         assert_eq!(cfg.transition_duration, 1.5);
     }

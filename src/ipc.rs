@@ -64,7 +64,15 @@ pub fn socket_path() -> Result<PathBuf> {
         .ok_or_else(|| anyhow!("XDG_RUNTIME_DIR is not set"))
 }
 
+const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
 pub async fn send_request(request: ClientRequest) -> Result<ClientResponse> {
+    tokio::time::timeout(REQUEST_TIMEOUT, do_send_request(request))
+        .await
+        .context("timed out waiting for daemon response")?
+}
+
+async fn do_send_request(request: ClientRequest) -> Result<ClientResponse> {
     let path = socket_path()?;
     let mut stream = UnixStream::connect(&path)
         .await

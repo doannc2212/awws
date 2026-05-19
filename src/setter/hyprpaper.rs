@@ -6,42 +6,33 @@ use tokio::process::Command;
 
 pub struct HyprpaperSetter;
 
-impl HyprpaperSetter {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
 #[async_trait]
 impl WallpaperSetter for HyprpaperSetter {
     async fn set(&self, path: &Path, _opts: &SetterOptions) -> Result<()> {
-        let preload = Command::new("hyprctl")
-            .arg("hyprpaper")
-            .arg("preload")
-            .arg(path)
-            .status()
-            .await?;
-        if !preload.success() {
-            return Err(anyhow!(
-                "hyprctl hyprpaper preload exited with status {preload}"
-            ));
+        let running = Command::new("pgrep")
+            .args(["-x", "hyprpaper"])
+            .output()
+            .await
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if !running {
+            return Err(anyhow!("hyprpaper is not running"));
         }
 
-        let wallpaper = format!(",{}", path.display());
-        let status = Command::new("hyprctl")
-            .arg("hyprpaper")
-            .arg("wallpaper")
-            .arg(wallpaper)
-            .status()
-            .await?;
+        let path_str = path
+            .to_str()
+            .ok_or_else(|| anyhow!("wallpaper path is not valid UTF-8"))?;
 
-        if status.success() {
-            Ok(())
-        } else {
-            Err(anyhow!(
-                "hyprctl hyprpaper wallpaper exited with status {status}"
-            ))
+        let out = Command::new("hyprctl")
+            .args(["hyprpaper", "wallpaper", &format!(", {path_str}")])
+            .output()
+            .await?;
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        if !out.status.success() || stdout.to_lowercase().contains("err") {
+            return Err(anyhow!("hyprpaper wallpaper failed: {stdout}"));
         }
+
+        Ok(())
     }
 
     fn name(&self) -> &str {

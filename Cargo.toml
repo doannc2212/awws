@@ -24,6 +24,7 @@ sha2 = "0.10"
 tokio = { version = "1.37", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "0.8"
 tracing = "0.1"
+tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 urlencoding = "2.1"
 zbus = { version = "4.3", default-features = false, features = ["tokio"] }
