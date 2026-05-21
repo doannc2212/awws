@@ -133,6 +133,12 @@ impl DaemonState {
             }
             DaemonCommand::Status => Ok("ok"),
             DaemonCommand::Reload => self.reload().await.map(|_| "reloaded"),
+            DaemonCommand::History => {
+                return ClientResponse::History(ipc::HistoryResponse {
+                    entries: self.history.entries().cloned().collect(),
+                    cursor: self.history.cursor(),
+                });
+            }
         };
 
         match result {

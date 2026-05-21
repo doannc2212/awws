@@ -30,12 +30,19 @@ pub struct StatusResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryResponse {
+    pub entries: Vec<HistoryEntry>,
+    pub cursor: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum ClientResponse {
     Ok {
         message: String,
         status: Option<StatusResponse>,
     },
+    History(HistoryResponse),
     Error {
         message: String,
     },
@@ -49,6 +56,7 @@ pub enum DaemonCommand {
     Resume,
     Status,
     Reload,
+    History,
 }
 
 #[derive(Debug)]
@@ -139,6 +147,7 @@ fn parse_command(cmd: &str) -> Result<DaemonCommand> {
         "resume" => Ok(DaemonCommand::Resume),
         "status" => Ok(DaemonCommand::Status),
         "reload" => Ok(DaemonCommand::Reload),
+        "history" => Ok(DaemonCommand::History),
         other => Err(anyhow!("unknown command: {other}")),
     }
 }
@@ -172,6 +181,10 @@ mod tests {
         assert!(matches!(
             parse_command("reload").unwrap(),
             DaemonCommand::Reload
+        ));
+        assert!(matches!(
+            parse_command("history").unwrap(),
+            DaemonCommand::History
         ));
     }
 
@@ -212,6 +225,31 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(v["result"], "error");
         assert_eq!(v["message"], "oops");
+    }
+
+    #[test]
+    fn client_response_history_has_correct_result_tag() {
+        let resp = ClientResponse::History(HistoryResponse {
+            entries: vec![],
+            cursor: None,
+        });
+        let json = serde_json::to_string(&resp).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["result"], "history");
+        assert_eq!(v["entries"], serde_json::json!([]));
+        assert!(v["cursor"].is_null());
+    }
+
+    #[test]
+    fn client_response_history_cursor_roundtrip() {
+        let resp = ClientResponse::History(HistoryResponse {
+            entries: vec![],
+            cursor: Some(2),
+        });
+        let json = serde_json::to_string(&resp).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["result"], "history");
+        assert_eq!(v["cursor"], 2);
     }
 
     #[test]

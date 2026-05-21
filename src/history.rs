@@ -110,6 +110,10 @@ impl History {
         self.entries.iter()
     }
 
+    pub fn cursor(&self) -> Option<usize> {
+        self.cursor
+    }
+
     fn trim(&mut self) {
         while self.entries.len() > self.max_entries {
             self.entries.pop_front();

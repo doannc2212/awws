@@ -37,6 +37,8 @@ enum Command {
     Status,
     /// Reload configuration without restarting the daemon
     Reload,
+    /// List wallpaper history with the current position marked
+    History,
 }
 
 #[tokio::main]
@@ -79,6 +81,7 @@ async fn main() -> Result<()> {
                 Command::Resume => ipc::ClientRequest::simple("resume"),
                 Command::Status => ipc::ClientRequest::simple("status"),
                 Command::Reload => ipc::ClientRequest::simple("reload"),
+                Command::History => ipc::ClientRequest::simple("history"),
                 Command::Daemon => unreachable!(),
             };
 
