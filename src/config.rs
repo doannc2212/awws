@@ -17,6 +17,15 @@ pub struct DaemonConfig {
     pub interval_secs: u64,
     pub change_on_login: bool,
     pub change_on_unlock: bool,
+    /// Shell command run after every wallpaper change. `%w` = wallpaper path.
+    pub on_change: Option<String>,
+    /// Shell command run once at daemon start. `%w` = last wallpaper path from
+    /// history. Useful for restoring a colorscheme immediately after reboot,
+    /// before the first interval fires.
+    pub on_start: Option<String>,
+    /// Shell command run when a source fails. `%e` = error message. Useful for
+    /// surfacing failures via `notify-send` or a status bar widget.
+    pub on_error: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -92,6 +101,9 @@ impl Default for DaemonConfig {
             interval_secs: 1800,
             change_on_login: true,
             change_on_unlock: true,
+            on_change: None,
+            on_start: None,
+            on_error: None,
         }
     }
 }
@@ -293,6 +305,56 @@ mod tests {
         assert_eq!(cfg.interval_secs, 1800);
         assert!(cfg.change_on_login);
         assert!(cfg.change_on_unlock);
+        assert!(cfg.on_change.is_none());
+        assert!(cfg.on_start.is_none());
+        assert!(cfg.on_error.is_none());
+    }
+
+    #[test]
+    fn on_start_parses_from_toml() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(&path, "[daemon]\non_start = \"wallust run %w\"\n").unwrap();
+        let cfg = load(&path).unwrap();
+        assert_eq!(cfg.daemon.on_start.as_deref(), Some("wallust run %w"));
+    }
+
+    #[test]
+    fn on_error_parses_from_toml() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(
+            &path,
+            "[daemon]\non_error = \"notify-send awws '%e'\"\n",
+        )
+        .unwrap();
+        let cfg = load(&path).unwrap();
+        assert_eq!(
+            cfg.daemon.on_error.as_deref(),
+            Some("notify-send awws '%e'")
+        );
+    }
+
+    #[test]
+    fn on_change_parses_from_toml() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(
+            &path,
+            "[daemon]\non_change = \"wallust run %w\"\n",
+        )
+        .unwrap();
+        let cfg = load(&path).unwrap();
+        assert_eq!(cfg.daemon.on_change.as_deref(), Some("wallust run %w"));
+    }
+
+    #[test]
+    fn on_change_absent_is_none() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(&path, "[daemon]\ninterval_secs = 300\n").unwrap();
+        let cfg = load(&path).unwrap();
+        assert!(cfg.daemon.on_change.is_none());
     }
 
     #[test]

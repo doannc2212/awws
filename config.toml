@@ -2,6 +2,9 @@
 interval_secs = 1800    # how often to rotate wallpapers, in seconds (1800 = 30 min)
 change_on_login = true  # change wallpaper when you log in
 change_on_unlock = true # change wallpaper when you unlock your screen
+# on_change = "wallust run %w"  # run after every wallpaper change (%w = wallpaper path)
+# on_start  = "wallust run %w"  # run once at daemon start (%w = last wallpaper from history)
+# on_error  = "notify-send -u critical 'awws' '%e'"  # run on source/setter failure (%e = error)
 
 [setter]
 backend = "awww"           # awww | hyprpaper | swww | swaybg

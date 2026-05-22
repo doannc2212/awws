@@ -2,6 +2,7 @@ use crate::{
     cache::ImageCache,
     config,
     history::{History, HistoryEntry},
+    hooks::HookBus,
     ipc::{self, ClientResponse, CommandEnvelope, DaemonCommand, StatusResponse},
     setter::{self, SetterOptions, WallpaperSetter},
     source::SourceRegistry,
@@ -14,6 +15,14 @@ use tokio::{signal, sync::mpsc};
 pub async fn run(config_path: PathBuf) -> Result<()> {
     let cfg = config::load(&config_path)?;
     let mut state = DaemonState::build(config_path, cfg).await?;
+
+    // Fire on_start with the last known wallpaper path from persisted history.
+    // This lets tools like wallust restore the colorscheme immediately on login,
+    // before the first interval fires or any new image is fetched.
+    if let Some(current) = state.history.current() {
+        state.hooks.publish_start(current.path);
+    }
+
     let (command_tx, mut command_rx) = mpsc::channel::<CommandEnvelope>(32);
     let ipc_task = tokio::spawn(ipc::serve(command_tx));
 
@@ -54,6 +63,7 @@ struct DaemonState {
     setter: Arc<dyn WallpaperSetter>,
     setter_opts: SetterOptions,
     triggers: mpsc::Receiver<TriggerEvent>,
+    hooks: HookBus,
     paused: bool,
     next_change_at: Option<chrono::DateTime<chrono::Utc>>,
     source_kind: config::SourceKind,
@@ -75,6 +85,11 @@ impl DaemonState {
         let setter_opts = SetterOptions::from(&cfg.setter);
         let triggers = trigger::spawn_all(&cfg.daemon);
         let next_change_at = next_change_at(cfg.daemon.interval_secs);
+        let hooks = HookBus::new(
+            cfg.daemon.on_change.as_deref(),
+            cfg.daemon.on_start.as_deref(),
+            cfg.daemon.on_error.as_deref(),
+        );
 
         Ok(Self {
             config_path,
@@ -85,6 +100,7 @@ impl DaemonState {
             setter,
             setter_opts,
             triggers,
+            hooks,
             paused: false,
             next_change_at,
             source_kind,
@@ -106,6 +122,11 @@ impl DaemonState {
         let setter = setter::from_config(&cfg.setter)?;
         let setter_opts = SetterOptions::from(&cfg.setter);
         let triggers = trigger::spawn_all(&cfg.daemon);
+        let hooks = HookBus::new(
+            cfg.daemon.on_change.as_deref(),
+            cfg.daemon.on_start.as_deref(),
+            cfg.daemon.on_error.as_deref(),
+        );
 
         self.cfg = cfg;
         self.cache = cache;
@@ -114,6 +135,7 @@ impl DaemonState {
         self.setter = setter;
         self.setter_opts = setter_opts;
         self.triggers = triggers;
+        self.hooks = hooks;
         self.next_change_at = next_change_at(self.cfg.daemon.interval_secs);
         self.source_kind = source_kind;
         Ok(())
@@ -154,11 +176,22 @@ impl DaemonState {
 
     async fn advance(&mut self, reason: String) -> Result<HistoryEntry> {
         tracing::info!(%reason, "advancing wallpaper");
-        let meta = self.sources.next().await?;
-        self.setter
-            .set(&meta.path, &self.setter_opts)
-            .await
-            .with_context(|| format!("setter {} failed", self.setter.name()))?;
+
+        let meta = match self.sources.next().await {
+            Ok(meta) => meta,
+            Err(err) => {
+                self.hooks.publish_error(err.to_string());
+                return Err(err);
+            }
+        };
+
+        if let Err(err) = self.setter.set(&meta.path, &self.setter_opts).await {
+            let err = err.context(format!("setter {} failed", self.setter.name()));
+            self.hooks.publish_error(err.to_string());
+            return Err(err);
+        }
+
+        self.hooks.publish_change(meta.path.clone());
         let entry = self.history.push(meta);
         self.cache.save_history(&self.history).await?;
         self.cache.evict(&self.history).await?;
@@ -172,6 +205,7 @@ impl DaemonState {
             .previous()
             .context("already at oldest history entry")?;
         self.setter.set(&entry.path, &self.setter_opts).await?;
+        self.hooks.publish_change(entry.path.clone());
         self.cache.save_history(&self.history).await?;
         Ok(entry)
     }
@@ -179,6 +213,7 @@ impl DaemonState {
     async fn apply_next(&mut self) -> Result<HistoryEntry> {
         if let Some(entry) = self.history.next_existing() {
             self.setter.set(&entry.path, &self.setter_opts).await?;
+            self.hooks.publish_change(entry.path.clone());
             self.cache.save_history(&self.history).await?;
             return Ok(entry);
         }
@@ -187,6 +222,7 @@ impl DaemonState {
             config::SourceKind::LocalOnly => {
                 if let Some(entry) = self.history.wrap_to_first() {
                     self.setter.set(&entry.path, &self.setter_opts).await?;
+                    self.hooks.publish_change(entry.path.clone());
                     self.cache.save_history(&self.history).await?;
                     return Ok(entry);
                 }

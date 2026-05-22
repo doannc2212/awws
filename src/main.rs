@@ -2,6 +2,7 @@ mod cache;
 mod config;
 mod daemon;
 mod history;
+mod hooks;
 mod ipc;
 mod setter;
 mod source;
