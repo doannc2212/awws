@@ -21,7 +21,7 @@
 //! closes its channel; the listener gets [`broadcast::error::RecvError::Closed`]
 //! and exits cleanly before the new listener starts.
 
-use std::{path::Path, path::PathBuf};
+use std::path::PathBuf;
 use tokio::sync::broadcast;
 
 /// All events that can be published on the hook bus.
@@ -164,6 +164,7 @@ fn spawn_command(cmd: String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     // Mirror the substitution done inside `dispatch` so we can test it without
     // spawning real processes.

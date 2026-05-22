@@ -323,11 +323,7 @@ mod tests {
     fn on_error_parses_from_toml() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("config.toml");
-        std::fs::write(
-            &path,
-            "[daemon]\non_error = \"notify-send awws '%e'\"\n",
-        )
-        .unwrap();
+        std::fs::write(&path, "[daemon]\non_error = \"notify-send awws '%e'\"\n").unwrap();
         let cfg = load(&path).unwrap();
         assert_eq!(
             cfg.daemon.on_error.as_deref(),
@@ -339,11 +335,7 @@ mod tests {
     fn on_change_parses_from_toml() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("config.toml");
-        std::fs::write(
-            &path,
-            "[daemon]\non_change = \"wallust run %w\"\n",
-        )
-        .unwrap();
+        std::fs::write(&path, "[daemon]\non_change = \"wallust run %w\"\n").unwrap();
         let cfg = load(&path).unwrap();
         assert_eq!(cfg.daemon.on_change.as_deref(), Some("wallust run %w"));
     }
