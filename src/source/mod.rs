@@ -127,3 +127,128 @@ impl SourceRegistry {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use config::RotationStrategy;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct Stub {
+        name: String,
+        succeed: bool,
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl Stub {
+        fn new(name: &str, succeed: bool) -> (Arc<Self>, Arc<AtomicUsize>) {
+            let calls = Arc::new(AtomicUsize::new(0));
+            let stub = Arc::new(Self {
+                name: name.into(),
+                succeed,
+                calls: calls.clone(),
+            });
+            (stub, calls)
+        }
+    }
+
+    #[async_trait]
+    impl ImageSource for Stub {
+        async fn next(&self) -> Result<ImageMeta> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if self.succeed {
+                Ok(ImageMeta {
+                    path: PathBuf::from(format!("/{}.jpg", self.name)),
+                    url: None,
+                    title: None,
+                    author: None,
+                    source: self.name.clone(),
+                })
+            } else {
+                Err(anyhow!("{} failed", self.name))
+            }
+        }
+
+        fn name(&self) -> &str {
+            &self.name
+        }
+    }
+
+    fn registry(sources: Vec<WeightedSource>, rotation: RotationStrategy) -> SourceRegistry {
+        SourceRegistry {
+            sources,
+            rotation,
+            cursor: 0,
+        }
+    }
+
+    fn weighted(source: Arc<dyn ImageSource>) -> WeightedSource {
+        WeightedSource { weight: 1, source }
+    }
+
+    #[test]
+    fn round_robin_pick_index_cycles() {
+        let (a, _) = Stub::new("a", true);
+        let (b, _) = Stub::new("b", true);
+        let mut reg = registry(vec![weighted(a), weighted(b)], RotationStrategy::RoundRobin);
+
+        assert_eq!(reg.pick_index().unwrap(), 0);
+        assert_eq!(reg.pick_index().unwrap(), 1);
+        assert_eq!(reg.pick_index().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn round_robin_next_advances_across_sources() {
+        let (a, _) = Stub::new("a", true);
+        let (b, _) = Stub::new("b", true);
+        let mut reg = registry(vec![weighted(a), weighted(b)], RotationStrategy::RoundRobin);
+
+        assert_eq!(reg.next().await.unwrap().source, "a");
+        assert_eq!(reg.next().await.unwrap().source, "b");
+        assert_eq!(reg.next().await.unwrap().source, "a");
+    }
+
+    #[tokio::test]
+    async fn next_fails_over_to_working_source() {
+        let (a, a_calls) = Stub::new("a", false);
+        let (b, b_calls) = Stub::new("b", true);
+        let mut reg = registry(vec![weighted(a), weighted(b)], RotationStrategy::RoundRobin);
+
+        let meta = reg.next().await.unwrap();
+        assert_eq!(meta.source, "b");
+        assert_eq!(a_calls.load(Ordering::SeqCst), 1, "failed source must be tried");
+        assert_eq!(b_calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn next_errors_when_all_sources_fail() {
+        let (a, _) = Stub::new("a", false);
+        let (b, _) = Stub::new("b", false);
+        let mut reg = registry(vec![weighted(a), weighted(b)], RotationStrategy::RoundRobin);
+
+        let err = reg.next().await.unwrap_err().to_string();
+        assert!(err.contains("all sources failed"));
+        assert!(err.contains("a failed"));
+        assert!(err.contains("b failed"));
+    }
+
+    #[tokio::test]
+    async fn next_tries_each_source_only_once_per_call() {
+        let (a, a_calls) = Stub::new("a", false);
+        let (b, b_calls) = Stub::new("b", false);
+        let mut reg = registry(vec![weighted(a), weighted(b)], RotationStrategy::RoundRobin);
+
+        let _ = reg.next().await;
+        assert_eq!(a_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(b_calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn weighted_random_single_source_is_returned() {
+        let (a, a_calls) = Stub::new("a", true);
+        let mut reg = registry(vec![weighted(a)], RotationStrategy::WeightedRandom);
+
+        assert_eq!(reg.next().await.unwrap().source, "a");
+        assert_eq!(a_calls.load(Ordering::SeqCst), 1);
+    }
+}
