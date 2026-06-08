@@ -16,9 +16,6 @@ pub async fn run(config_path: PathBuf) -> Result<()> {
     let cfg = config::load(&config_path)?;
     let mut state = DaemonState::build(config_path, cfg).await?;
 
-    // Fire on_start with the last known wallpaper path from persisted history.
-    // This lets tools like wallust restore the colorscheme immediately on login,
-    // before the first interval fires or any new image is fetched.
     if let Some(current) = state.history.current() {
         state.hooks.publish_start(current.path);
     }

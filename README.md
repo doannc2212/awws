@@ -57,6 +57,48 @@ controls when wallpapers change automatically.
 interval_secs = 1800    # how often to rotate, in seconds (1800 = 30 minutes)
 change_on_login = true  # change when you log in
 change_on_unlock = true # change when you unlock your screen
+# on_change = "wallust run %w"  # shell command to run after every change
+```
+
+#### hooks
+
+hooks are how awws reaches *out* to the rest of your rice — when something happens inside the daemon, it runs a command you've chosen. (for the other direction, driving awws *from* a script, see [scripting](#scripting) below.)
+
+there are three of them. all run as `sh -c <command>`, so pipes, `&&`, and environment variables all work. if a hook exits with an error, awws just logs a warning and keeps going — a broken hook never interrupts the daemon. they also run fire-and-forget, so a slow hook won't hold up the next wallpaper change.
+
+here's the whole surface at a glance:
+
+| hook | runs when | placeholder |
+|------|-----------|-------------|
+| `on_change` | after every successful wallpaper change | `%w` = new wallpaper path |
+| `on_start` | once when the daemon starts | `%w` = last wallpaper from history |
+| `on_error` | an automatic change fails | `%e` = the error message |
+
+the placeholders are plain text substitution — every `%w` (or `%e`) in your command is swapped for the value before the shell sees it, so feel free to use it more than once.
+
+**`on_change`** — runs after every successful wallpaper change. `%w` = absolute path of the new wallpaper. this is the main integration point for colorscheme pipelines.
+
+```toml
+[daemon]
+on_change = "wallust run %w"
+# on_change = "matugen image %w"
+# on_change = "wallust run %w && pkill -SIGUSR2 waybar"
+```
+
+**`on_start`** — runs once when the daemon starts, using the last wallpaper from history. `%w` = that path. the practical use: after a reboot, your colorscheme is restored immediately — before the first interval fires or any new image is fetched — so waybar, kitty, and rofi all come up already themed.
+
+```toml
+[daemon]
+on_start = "wallust run %w"
+```
+
+if you set both `on_start` and `on_change`, and `change_on_login` is also true, you'll see both fire on login: `on_start` with the previous wallpaper, then `on_change` with the new one. that's intentional — `on_start` restores the known state, `on_change` updates it.
+
+**`on_error`** — runs when an automatic wallpaper advance fails (network down, api rate limit, empty folder, etc.). `%e` = the error message. note that it fires on *automatic* advances only — when you run `awws next` / `awws prev` yourself, any error comes back to you directly (in the terminal, or in the json response if you're talking to the socket) rather than through this hook.
+
+```toml
+[daemon]
+on_error = "notify-send -u critical 'awws' '%e'"
 ```
 
 ---
@@ -207,6 +249,60 @@ max_size_mb = 500              # max disk space for cached images
 history_size = 100             # how many past wallpapers to remember
 dir = "~/.cache/awws/images"  # where to store them
 ```
+
+## scripting
+
+if you want another program to *drive* awws — a keybind, a status bar, a little script — you have two options, and honestly the first one is enough for almost everything.
+
+**just run the cli.** `awws next`, `awws status`, and the rest already do the right thing. under the hood the cli isn't doing anything special: it connects to a small unix socket, sends one line of json, and prints the reply. so when you shell out to `awws next`, you're already going through the same path the socket exposes.
+
+```bash
+# a hyprland keybind, for example
+bind = $mod, W, exec, awws next
+```
+
+**talk to the socket directly.** if you'd rather skip spawning the binary — say you're polling `status` often from a bar widget — you can speak to the socket yourself. it lives at `$XDG_RUNTIME_DIR/awws.sock` and the protocol is deliberately tiny: write one json object followed by a newline, read one json line back.
+
+a request is just a command name:
+
+```json
+{"cmd": "next"}
+```
+
+the valid commands are the same ones the cli has: `next`, `prev`, `pause`, `resume`, `status`, `reload`, `history`.
+
+the reply is a single json line, tagged by a `result` field. there are three shapes:
+
+```json
+{"result": "ok", "message": "advanced", "status": { ... }}
+{"result": "history", "entries": [ ... ], "cursor": 3}
+{"result": "error", "message": "all sources failed"}
+```
+
+most commands answer with `ok` and a short `message` (`status` carries the same `status` block you'd see from `awws status`); `history` answers with its own shape; and anything that went wrong comes back as `error` with a human-readable `message`.
+
+a quick one-liner to try it, no awws binary involved:
+
+```bash
+echo '{"cmd":"status"}' | socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/awws.sock
+```
+
+or from python, which is roughly what i'd reach for in a real script:
+
+```python
+import json, os, socket
+
+def awws(cmd):
+    path = os.path.join(os.environ["XDG_RUNTIME_DIR"], "awws.sock")
+    with socket.socket(socket.AF_UNIX) as s:
+        s.connect(path)
+        s.sendall((json.dumps({"cmd": cmd}) + "\n").encode())
+        return json.loads(s.makefile().readline())
+
+print(awws("status"))
+```
+
+one honest caveat: the cli is a stable interface and i'll try to keep it that way, but the raw json schema is closer to an internal detail. if you build something against the socket directly, a future version might shift a field under you. shelling out to the cli insulates you from that, so reach for the socket only when you actually need to.
 
 ## autostart
 
