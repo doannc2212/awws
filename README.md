@@ -12,7 +12,7 @@ source  →  cache  →  setter
 trigger
 ```
 
-- **source** — where images come from: your local folder, Bing daily, NASA APOD, or Unsplash
+- **source** — where images come from: your local folder, Bing daily, NASA APOD, Unsplash, or Wallhaven
 - **trigger** — when to change: on a timer, on login, or on screen unlock (via D-Bus)
 - **setter** — how to apply: `awww`, `hyprpaper`, `swaybg`, or `swww`
 - **cache** — downloaded images are stored locally so things stay fast and offline-friendly
@@ -184,12 +184,26 @@ api_key = "your_api_key_here"
 weight = 1
 ```
 
+#### wallhaven
+
+random wallpapers from [wallhaven.cc](https://wallhaven.cc). no api key needed unless you want nsfw results.
+
+```toml
+[[sources.list]]
+type = "wallhaven"
+api_key = "your_api_key_here"  # optional — only needed for nsfw purity
+query = "landscape"            # optional — search terms
+categories = "111"             # optional — general/anime/people as on/off bits
+purity = "100"                 # optional — sfw/sketchy/nsfw as on/off bits
+weight = 1
+```
+
 #### source type and `next` behaviour
 
 awws distinguishes between local and remote sources, and this affects how `awws next` works:
 
 - **local-only** — `awws next` cycles through your history. when it reaches the latest wallpaper it wraps back to the oldest, so you get a smooth loop through everything that's been shown.
-- **remote-only** (bing, unsplash, nasa apod) — `awws next` always fetches a fresh image from the source.
+- **remote-only** (bing, unsplash, nasa apod, wallhaven) — `awws next` always fetches a fresh image from the source.
 - **mixed** — combining local and remote sources in the same config is not supported. awws will refuse to start and print an error. keep all your sources either local or remote.
 
 #### multiple remote sources

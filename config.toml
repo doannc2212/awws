@@ -39,6 +39,14 @@ weight = 1
 # api_key = "your_api_key_here"
 # weight = 1
 
+# [[sources.list]]
+# type = "wallhaven"
+# api_key = "your_api_key_here"  # optional — only needed for NSFW purity
+# query = "landscape"            # optional — search terms
+# categories = "111"             # optional — general/anime/people as on/off bits
+# purity = "100"                 # optional — sfw/sketchy/nsfw as on/off bits
+# weight = 1
+
 [cache]
 max_size_mb = 500              # max disk space for cached images, in MB
 history_size = 100             # how many past wallpapers to remember

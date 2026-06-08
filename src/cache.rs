@@ -197,7 +197,10 @@ mod tests {
         let history = history_protecting(&[protected.clone()]);
         cache.evict(&history).await.unwrap();
 
-        assert!(protected.exists(), "current history entry must survive eviction");
+        assert!(
+            protected.exists(),
+            "current history entry must survive eviction"
+        );
         assert!(!stale.exists());
     }
 

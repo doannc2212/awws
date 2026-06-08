@@ -2,6 +2,7 @@ mod bing;
 mod local;
 mod nasa_apod;
 mod unsplash;
+mod wallhaven;
 
 use crate::{cache::ImageCache, config};
 use anyhow::{Result, anyhow};
@@ -14,6 +15,7 @@ pub use bing::BingSource;
 pub use local::LocalSource;
 pub use nasa_apod::NasaApodSource;
 pub use unsplash::UnsplashSource;
+pub use wallhaven::WallhavenSource;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageMeta {
@@ -71,6 +73,19 @@ impl SourceRegistry {
                 config::SourceConfig::NasaApod { api_key, .. } => {
                     Arc::new(NasaApodSource::new(cache.clone(), api_key.clone()))
                 }
+                config::SourceConfig::Wallhaven {
+                    api_key,
+                    query,
+                    categories,
+                    purity,
+                    ..
+                } => Arc::new(WallhavenSource::new(
+                    cache.clone(),
+                    api_key.clone(),
+                    query.clone(),
+                    categories.clone(),
+                    purity.clone(),
+                )),
             };
             sources.push(WeightedSource {
                 weight: config::source_weight(source_cfg).max(1),
@@ -216,7 +231,11 @@ mod tests {
 
         let meta = reg.next().await.unwrap();
         assert_eq!(meta.source, "b");
-        assert_eq!(a_calls.load(Ordering::SeqCst), 1, "failed source must be tried");
+        assert_eq!(
+            a_calls.load(Ordering::SeqCst),
+            1,
+            "failed source must be tried"
+        );
         assert_eq!(b_calls.load(Ordering::SeqCst), 1);
     }
 

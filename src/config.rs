@@ -77,6 +77,14 @@ pub enum SourceConfig {
         weight: u32,
         api_key: String,
     },
+    Wallhaven {
+        #[serde(default = "default_weight")]
+        weight: u32,
+        api_key: Option<String>,
+        query: Option<String>,
+        categories: Option<String>,
+        purity: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -201,7 +209,8 @@ pub fn source_weight(source: &SourceConfig) -> u32 {
         SourceConfig::Local { weight, .. }
         | SourceConfig::Bing { weight }
         | SourceConfig::Unsplash { weight, .. }
-        | SourceConfig::NasaApod { weight, .. } => *weight,
+        | SourceConfig::NasaApod { weight, .. }
+        | SourceConfig::Wallhaven { weight, .. } => *weight,
     }
 }
 
@@ -265,6 +274,16 @@ mod tests {
                 api_key: "k".into()
             }),
             1
+        );
+        assert_eq!(
+            source_weight(&SourceConfig::Wallhaven {
+                weight: 5,
+                api_key: None,
+                query: None,
+                categories: None,
+                purity: None
+            }),
+            5
         );
     }
 
