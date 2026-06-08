@@ -40,6 +40,8 @@ enum Command {
     Reload,
     /// List wallpaper history with the current position marked
     History,
+    /// Remove cached images and history, keeping only the current wallpaper
+    Clean,
 }
 
 #[tokio::main]
@@ -83,6 +85,7 @@ async fn main() -> Result<()> {
                 Command::Status => ipc::ClientRequest::simple("status"),
                 Command::Reload => ipc::ClientRequest::simple("reload"),
                 Command::History => ipc::ClientRequest::simple("history"),
+                Command::Clean => ipc::ClientRequest::simple("clean"),
                 Command::Daemon => unreachable!(),
             };
 

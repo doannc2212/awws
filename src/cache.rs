@@ -55,6 +55,30 @@ impl ImageCache {
         history.save(&self.history_path).await
     }
 
+    pub async fn clean(&self, history: &History) -> Result<u64> {
+        let protected: std::collections::HashSet<PathBuf> =
+            history.entries().map(|entry| entry.path.clone()).collect();
+        let mut files = fs::read_dir(&self.image_dir).await?;
+        let mut removed = 0u64;
+
+        while let Some(entry) = files.next_entry().await? {
+            let meta = entry.metadata().await?;
+            if !meta.is_file() {
+                continue;
+            }
+            let path = entry.path();
+            if protected.contains(&path) {
+                continue;
+            }
+            fs::remove_file(&path)
+                .await
+                .with_context(|| format!("failed to remove {}", path.display()))?;
+            removed += 1;
+        }
+
+        Ok(removed)
+    }
+
     pub async fn evict(&self, history: &History) -> Result<()> {
         let mut files = fs::read_dir(&self.image_dir).await?;
         let protected: std::collections::HashSet<PathBuf> =

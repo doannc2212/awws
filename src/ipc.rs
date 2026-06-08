@@ -57,6 +57,7 @@ pub enum DaemonCommand {
     Status,
     Reload,
     History,
+    Clean,
 }
 
 #[derive(Debug)]
@@ -148,6 +149,7 @@ fn parse_command(cmd: &str) -> Result<DaemonCommand> {
         "status" => Ok(DaemonCommand::Status),
         "reload" => Ok(DaemonCommand::Reload),
         "history" => Ok(DaemonCommand::History),
+        "clean" => Ok(DaemonCommand::Clean),
         other => Err(anyhow!("unknown command: {other}")),
     }
 }
@@ -185,6 +187,10 @@ mod tests {
         assert!(matches!(
             parse_command("history").unwrap(),
             DaemonCommand::History
+        ));
+        assert!(matches!(
+            parse_command("clean").unwrap(),
+            DaemonCommand::Clean
         ));
     }
 

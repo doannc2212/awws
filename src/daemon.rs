@@ -158,6 +158,17 @@ impl DaemonState {
                     cursor: self.history.cursor(),
                 });
             }
+            DaemonCommand::Clean => {
+                return match self.apply_clean().await {
+                    Ok(removed) => ClientResponse::Ok {
+                        message: format!("cleaned {removed} cached image(s)"),
+                        status: Some(self.status()),
+                    },
+                    Err(err) => ClientResponse::Error {
+                        message: err.to_string(),
+                    },
+                };
+            }
         };
 
         match result {
@@ -227,6 +238,13 @@ impl DaemonState {
             }
             _ => self.advance("ipc next".to_string()).await,
         }
+    }
+
+    async fn apply_clean(&mut self) -> Result<u64> {
+        self.history.keep_only_current();
+        let removed = self.cache.clean(&self.history).await?;
+        self.cache.save_history(&self.history).await?;
+        Ok(removed)
     }
 
     fn status(&self) -> StatusResponse {

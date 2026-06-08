@@ -106,6 +106,19 @@ impl History {
         self.current()
     }
 
+    pub fn keep_only_current(&mut self) -> Option<HistoryEntry> {
+        let current = self.current();
+        self.entries.clear();
+        match current.clone() {
+            Some(entry) => {
+                self.entries.push_back(entry);
+                self.cursor = Some(0);
+            }
+            None => self.cursor = None,
+        }
+        current
+    }
+
     pub fn entries(&self) -> impl Iterator<Item = &HistoryEntry> {
         self.entries.iter()
     }
@@ -222,6 +235,29 @@ mod tests {
             h.push(meta(&format!("/tmp/{i}.jpg")));
         }
         assert_eq!(h.entries().count(), 3);
+    }
+
+    #[test]
+    fn keep_only_current_retains_single_entry() {
+        let mut h = History::new(10);
+        h.push(meta("/tmp/a.jpg"));
+        h.push(meta("/tmp/b.jpg"));
+        h.push(meta("/tmp/c.jpg"));
+        h.previous(); // current is b
+        let kept = h.keep_only_current().unwrap();
+        assert_eq!(kept.path, PathBuf::from("/tmp/b.jpg"));
+        assert_eq!(h.entries().count(), 1);
+        assert_eq!(h.cursor(), Some(0));
+        assert!(h.previous().is_none());
+        assert!(h.next_existing().is_none());
+    }
+
+    #[test]
+    fn keep_only_current_on_empty_is_noop() {
+        let mut h = History::new(10);
+        assert!(h.keep_only_current().is_none());
+        assert_eq!(h.entries().count(), 0);
+        assert_eq!(h.cursor(), None);
     }
 
     #[tokio::test]
